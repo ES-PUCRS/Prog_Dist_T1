@@ -31,6 +31,7 @@ javac ./*.java -d "./_class" -Xlint:unchecked
 # 0		SEMAPHORE 3s SERVER
 # 1 	CLIENT  	 ONLY
 # 9		CLIENT  	 $SEMAPHORE_PORT $CLIENT_PORT
+# 86	SAME CALL TERMINAL SERVER $SEMAPHORE_PORT
 # 87	SAME CALL TERMINAL SERVER ONLY
 # 96	SAME CALL TERMINAL CLIENT $CLIENT_PORT $METHOD
 # 97	SAME CALL TERMINAL CLIENT ONLY
@@ -71,10 +72,15 @@ then
 		xterm -T "RMIClient" -ls -e $client_command &
 	
 
-	# INIT CLIENT ONLY WITH PARAMS
+	# INIT SERVER ONLY WITHOUT NEW TERMINAL
 	elif [[ $1 -eq "87" ]]
 	then
 		java -cp ./_class RMIServer $semaphore_ip $semaphore_port $server_ip $server_port
+
+	# INIT SERVER ONLY WITH PARAMS WITHOUT NEW TERMINAL
+	elif [[ $1 -eq "86" ]]
+	then
+		java -cp ./_class RMIServer $semaphore_ip $semaphore_port $server_ip $2
 
 
 	# INIT CLIENT ONLY WITH PARAMS
@@ -87,13 +93,13 @@ then
 	# INIT CLIENT ONLY WITH PORT PARAM WITHOUT NEW TERMINAL
 	elif [[ $1 -eq "96" ]]
 	then
-	java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $2 $queries $inserts $deletions $3
+		java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $2 $queries $inserts $deletions $3
 
 
 	# INIT CLIENT ONLY WITHOUT NEW TERMINAL
 	elif [[ $1 -eq "97" ]]
 	then
-	java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $client_port $queries $inserts $deletions
+		java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $client_port $queries $inserts $deletions
 
 
 	# INIT CLIENT ONLY WITH PARAMS WITHOUT NEW TERMINAL

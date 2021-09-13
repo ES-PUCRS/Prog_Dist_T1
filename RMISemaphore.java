@@ -128,7 +128,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		}
 	}
 
-/* MUTEX ------------------------------------------------------- */
+/* MUTEX'S------------------------------------------------------ */
 
 	public static void p() throws InterruptedException {
 		mutex.acquire();
@@ -148,15 +148,14 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		if(countAvailable == 0) {
 			System.out.println("** Waiting free server");
 			serversMutex.acquire();
-		} else
+		} else {
 			countAvailable--;
+		}
 	}
 
 	public static void vServer(){
 		countAvailable++;
-		if(countAvailable > 0){
-			serversMutex.release();
-		}
+		serversMutex.release();
 	}
 
 /* InterfaceSemaphore ------------------------------------------ */
@@ -168,7 +167,8 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 			String serverKey = key(getClientHost(), port);
 			dst = busyServers.remove(serverKey);
 			freeServers.add(serverKey);
-	
+			vServer();
+
 			System.out.println(content + " < Server::" + serverKey);
 		} catch (Exception e) {
 			System.out.println(e.getLocalizedMessage());
@@ -181,18 +181,18 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 		changed = true;
 
-		v();
+		// v();
 		return 1;
 	}
 
 	@Override
 	public int register(String ip, String port) {
 		callback = "Server registered as key <" + ip + ":" + port + ">";
-		freeServers.add(key(ip, port));
 		remoteHostPort = port;
 		remoteHostName = ip;
 		changed = true;
 
+		freeServers.add(key(ip, port));
 		vServer();
 		return 1;
 	}
@@ -203,17 +203,17 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 	@Override
 	public int Query(String query, String port) {
 		InterfaceServer remoteConnection = null;
+		String server = "";
 		try {
 			pServer();
-			String server = freeServers.remove();
+			server = freeServers.remove();
 			busyServers.put(server, key(getClientHost(), port));
 			remoteConnection = (InterfaceServer) registerHost(getIp(server),getPort(server));
-
-			System.out.println("JOB Query to: " + server);
 		} catch (Exception e) {}
 
 		try {
-			p();
+			p();			
+			System.out.println("JOB Query to: " + server);
 			remoteConnection.Query(query, port);
 		} catch (Exception e) {
 			System.out.println("RMI ERROR CALLING SERVER: " + e.getLocalizedMessage());
