@@ -8,12 +8,13 @@ import java.util.concurrent.Semaphore;
 import java.lang.InterruptedException;
 
 class RMIServer extends UnicastRemoteObject implements InterfaceServer, InterfaceCallback {
-	private static volatile boolean debug = true;
+	private static volatile boolean debug = false;
 	private static volatile int registry;
 
 	private static volatile String remoteHostName, remoteHostPort;
-	private static volatile String response;
 	private static volatile boolean changed;
+	private static volatile String response;
+	private static volatile String method;
 
 	private static volatile InterfaceSemaphore remoteConnection;
 
@@ -88,7 +89,7 @@ class RMIServer extends UnicastRemoteObject implements InterfaceServer, Interfac
 				changed = false;
 
 				try {
-					remoteConnection.response(response, port);
+					remoteConnection.response(response, method, port);
 				} catch (RemoteException e) {
 					System.out.println(e.getLocalizedMessage());
 					if(debug)
@@ -96,7 +97,7 @@ class RMIServer extends UnicastRemoteObject implements InterfaceServer, Interfac
 				}
 			}
 			
-			try { Thread.sleep(100); }
+			try { Thread.sleep(2000); }
 			catch (InterruptedException ex) {}
 		}
 	}
@@ -115,9 +116,12 @@ class RMIServer extends UnicastRemoteObject implements InterfaceServer, Interfac
 	public int Query(String query, String port) {
 		response = query + " QUERIADO!";
 		changed = true;
+		method = "query";
+
 		try {
 			remoteHostName = getClientHost();
 			remoteHostPort = port;
+			System.out.println("Quering: \'" + query + "\' From: " +remoteHostName+":"+port);
 		} catch (Exception e) {
 			System.out.println ("Failed to get client IP");
 			e.printStackTrace();
@@ -129,9 +133,12 @@ class RMIServer extends UnicastRemoteObject implements InterfaceServer, Interfac
 	public int Insert(int id, String port) {
 		response = id + " INSERTADO!";
 		changed = true;
+		method = "insert";
+
 		try {
 			remoteHostName = getClientHost();
 			remoteHostPort = port;
+			System.out.println("Inserting id: \'" + id + "\' From: " + remoteHostName+":"+port);
 		} catch (Exception e) {
 			System.out.println ("Failed to get client IP");
 			e.printStackTrace();
@@ -143,9 +150,12 @@ class RMIServer extends UnicastRemoteObject implements InterfaceServer, Interfac
 	public int Remove(int id, String port) {
 		response = id + " REMOVADO!";
 		changed = true;
+		method = "remove";
+
 		try {
 			remoteHostName = getClientHost();
 			remoteHostPort = port;
+			System.out.println("Removing id: \'" + id + "\' From: " +remoteHostName+":"+port);
 		} catch (Exception e) {
 			System.out.println ("Failed to get client IP");
 			e.printStackTrace();

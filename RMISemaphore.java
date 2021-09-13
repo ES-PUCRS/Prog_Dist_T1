@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.lang.InterruptedException;
 
 class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, InterfaceServer {
-	private static volatile boolean debug = true;
+	private static volatile boolean debug = false;
 	private static volatile int registry;
 
 	private static volatile String remoteHostName, remoteHostPort;
@@ -23,15 +23,15 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 
 	private static volatile Semaphore serversMutex;
-	private static volatile int countAvailable;
 
 	private static volatile Semaphore semaphore;
 
-	private static volatile Semaphore insertMutex;
-	private static volatile Semaphore removeMutex;
+	private static volatile Semaphore insertSemaphore;
+	private static volatile Semaphore removeSemaphore;
 	private static volatile Semaphore queryMutex;
 	private static volatile String method;
-	private static volatile int count;
+
+	private static volatile int queryMutexCount;
 
 
 	public RMISemaphore() throws RemoteException {
@@ -41,15 +41,14 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		serversMutex  = new Semaphore(1);
 		try { serversMutex.acquire(); }
 		catch (Exception e) {}
-		countAvailable  = 0;
 
 		semaphore = new Semaphore(1);
 
-		insertMutex  = new Semaphore(1);
-		removeMutex  = new Semaphore(1);
+		insertSemaphore  = new Semaphore(1);
+		removeSemaphore  = new Semaphore(1);
 		queryMutex  = new Semaphore(1);
 		method = "";
-		count  = 0;
+		queryMutexCount  = 0;
 	}
 
 
@@ -123,7 +122,6 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 				}
 				try {
 					callbackLocation.Callback(callback);
-					v();
 				} catch (RemoteException e) {
 					if(debug)
 						e.printStackTrace();
@@ -142,45 +140,81 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 	// }
 
 	private static void p(String request) throws InterruptedException {
-		switch (request) {
-			
+		switch (request.toLowerCase()) {
+			case "query":
+				if(queryMutexCount < 1) {
+				System.out.println("aquire mutex!");
+					queryMutex.acquire();
+				System.out.println("**aquired mutex!");
+				}
+
+				queryMutexCount++;
+				System.out.println("count: " + queryMutexCount);
+				break;
+
+			case "insert":
+				System.out.println("acquire insert!");
+				insertSemaphore.acquire();
+				System.out.println("**acquired insert!");
+				break;
+
+			case "remove":
+				System.out.println("aquire all!");
+				queryMutex.acquire();
+				insertSemaphore.acquire();
+				removeSemaphore.acquire();
+				System.out.println("**aquired all!");
+				break;
 		}
 	}
 
-	private static void v(){
-		count--;
-		if(count == 0){
-			mutex.release();
-			method = "";
+	private static void v(String response) {
+		switch(response.toLowerCase()) {
+			case "query":
+				queryMutexCount--;
+				if(queryMutexCount == 0){
+					queryMutex.release();
+					System.out.println("RELEASE MUTEX!");
+				}
+				break;
+
+			case "insert":
+				insertSemaphore.release();
+				System.out.println("RELEASE INSERT!");
+				break;
+
+			case "remove":
+				System.out.println("COUNT -->> " + queryMutexCount);
+				queryMutex.release();
+				insertSemaphore.release();
+				removeSemaphore.release();
+				System.out.println("RELEASE ALL!");
+				break;
 		}
 	}
 
 
 	private static void pServer() throws InterruptedException {
-		if(countAvailable == 0) {
+		if(freeServers.size() == 0) {
 			System.out.println("** Waiting free server");
 			serversMutex.acquire();
-		} else {
-			countAvailable--;
 		}
 	}
 
 	private static void vServer(){
-		countAvailable++;
 		serversMutex.release();
 	}
 
 /* InterfaceSemaphore ------------------------------------------ */
 	
 	@Override
-	public int response(String content, String port) {
+	public int response(String content, String method, String port) {
 		String dst = "";
 		try {
 			String serverKey = key(getClientHost(), port);
 			dst = busyServers.remove(serverKey);
 			freeServers.add(serverKey);
-			vServer();
-
+			
 			System.out.println(content + " < Server::" + serverKey);
 		} catch (Exception e) {
 			System.out.println(e.getLocalizedMessage());
@@ -193,7 +227,8 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 		changed = true;
 
-		v();
+		v(method);
+		vServer();
 		return 1;
 	}
 

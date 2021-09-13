@@ -9,11 +9,10 @@ server_port="9999"
 client_ip="127.0.0.1"
 client_port="8888"
 
-queries="70"
-inserts="20"
-deletions="10"
+queries="60"
+inserts="18"
 
-client_command="java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $client_port $queries $inserts $deletions && read -s -n 1 -p 'Press any button to continue.'"
+client_command="java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $client_port $queries $inserts && read -s -n 1 -p 'Press any button to continue.'"
 server_command="java -cp ./_class RMIServer $semaphore_ip $semaphore_port $server_ip $server_port"
 semaphore_command="java -cp ./_class RMISemaphore $semaphore_ip $semaphore_port"
 
@@ -87,25 +86,25 @@ then
 	elif [[ $1 -eq "9" ]]
 	then
 		#   														          Port          Port
-		xterm -T "RMIClient" -ls -e "java -cp ./_class RMIClient $semaphore_ip $2 $client_ip $3 $queries $inserts $deletions && read -s -n 1 -p 'Press any button to continue.'" &
+		xterm -T "RMIClient" -ls -e "java -cp ./_class RMIClient $semaphore_ip $2 $client_ip $3 $queries $inserts && read -s -n 1 -p 'Press any button to continue.'" &
 	
 
 	# INIT CLIENT ONLY WITH PORT PARAM WITHOUT NEW TERMINAL
 	elif [[ $1 -eq "96" ]]
 	then
-		java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $2 $queries $inserts $deletions $3
+		java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $2 $queries $inserts $3
 
 
 	# INIT CLIENT ONLY WITHOUT NEW TERMINAL
 	elif [[ $1 -eq "97" ]]
 	then
-		java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $client_port $queries $inserts $deletions
+		java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $client_port $queries $inserts
 
 
 	# INIT CLIENT ONLY WITH PARAMS WITHOUT NEW TERMINAL
 	elif [[ $1 -eq "99" ]]
 	then 													
     #										     Port          Port
-		java -cp ./_class RMIClient $semaphore_ip $2 $client_ip $3 $queries $inserts $deletions
+		java -cp ./_class RMIClient $semaphore_ip $2 $client_ip $3 $queries $inserts
 	fi
 fi
