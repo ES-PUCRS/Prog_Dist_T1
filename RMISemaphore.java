@@ -122,30 +122,27 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 				}
 				try {
 					callbackLocation.Callback(callback);
+					v(method);
 				} catch (RemoteException e) {
 					if(debug)
 						e.printStackTrace();
 				}
 			}
+
 			
-			try { Thread.sleep(100); }
+			try { Thread.sleep(100); release(); }
 			catch (InterruptedException ex) {}
+			
 		}
 	}
 
 /* MUTEX'S------------------------------------------------------ */
 
-	// private static void semaphoreShiftLight(String acquire) throws InterruptedException {
-	// 	if(method.equals(acquire))
-	// }
-
 	private static void p(String request) throws InterruptedException {
 		switch (request.toLowerCase()) {
 			case "query":
 				if(queryMutexCount < 1) {
-				System.out.println("aquire mutex!");
 					queryMutex.acquire();
-				System.out.println("**aquired mutex!");
 				}
 
 				queryMutexCount++;
@@ -153,17 +150,13 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 				break;
 
 			case "insert":
-				System.out.println("acquire insert!");
 				insertSemaphore.acquire();
-				System.out.println("**acquired insert!");
 				break;
 
 			case "remove":
-				System.out.println("aquire all!");
 				queryMutex.acquire();
 				insertSemaphore.acquire();
 				removeSemaphore.acquire();
-				System.out.println("**aquired all!");
 				break;
 		}
 	}
@@ -172,23 +165,19 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		switch(response.toLowerCase()) {
 			case "query":
 				queryMutexCount--;
-				if(queryMutexCount == 0){
+				if(queryMutexCount == 0) {
 					queryMutex.release();
-					System.out.println("RELEASE MUTEX!");
 				}
 				break;
 
 			case "insert":
 				insertSemaphore.release();
-				System.out.println("RELEASE INSERT!");
 				break;
 
 			case "remove":
-				System.out.println("COUNT -->> " + queryMutexCount);
 				queryMutex.release();
 				insertSemaphore.release();
 				removeSemaphore.release();
-				System.out.println("RELEASE ALL!");
 				break;
 		}
 	}
@@ -196,7 +185,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 	private static void pServer() throws InterruptedException {
 		if(freeServers.size() == 0) {
-			System.out.println("** Waiting free server");
+			System.out.println("** Waiting for available server");
 			serversMutex.acquire();
 		}
 	}
@@ -208,7 +197,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 /* InterfaceSemaphore ------------------------------------------ */
 	
 	@Override
-	public int response(String content, String method, String port) {
+	public int response(String content, String res, String port) {
 		String dst = "";
 		try {
 			String serverKey = key(getClientHost(), port);
@@ -226,9 +215,8 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		callback = content;
 
 		changed = true;
-
-		v(method);
 		vServer();
+		method = res;
 		return 1;
 	}
 
@@ -321,6 +309,16 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 
 /* AUX Methods ------------------------------------------------- */
+
+	private static int roltimes = 0;
+	private static void release() {
+		roltimes++;
+		if(roltimes%7==0){
+			queryMutex.release();
+			insertSemaphore.release();
+			removeSemaphore.release();
+		}	
+	}
 
 	private String getIp(String key) {
 		return key.split(":")[0];
