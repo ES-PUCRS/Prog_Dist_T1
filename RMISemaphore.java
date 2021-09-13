@@ -25,8 +25,11 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 	private static volatile Semaphore serversMutex;
 	private static volatile int countAvailable;
 
+	private static volatile Semaphore semaphore;
 
-	private static volatile Semaphore mutex;
+	private static volatile Semaphore insertMutex;
+	private static volatile Semaphore removeMutex;
+	private static volatile Semaphore queryMutex;
 	private static volatile String method;
 	private static volatile int count;
 
@@ -40,7 +43,11 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		catch (Exception e) {}
 		countAvailable  = 0;
 
-		mutex  = new Semaphore(1);
+		semaphore = new Semaphore(1);
+
+		insertMutex  = new Semaphore(1);
+		removeMutex  = new Semaphore(1);
+		queryMutex  = new Semaphore(1);
 		method = "";
 		count  = 0;
 	}
@@ -130,12 +137,17 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 /* MUTEX'S------------------------------------------------------ */
 
-	public static void p() throws InterruptedException {
-		mutex.acquire();
-		count++;
+	// private static void semaphoreShiftLight(String acquire) throws InterruptedException {
+	// 	if(method.equals(acquire))
+	// }
+
+	private static void p(String request) throws InterruptedException {
+		switch (request) {
+			
+		}
 	}
 
-	public static void v(){
+	private static void v(){
 		count--;
 		if(count == 0){
 			mutex.release();
@@ -144,7 +156,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 	}
 
 
-	public static void pServer() throws InterruptedException {
+	private static void pServer() throws InterruptedException {
 		if(countAvailable == 0) {
 			System.out.println("** Waiting free server");
 			serversMutex.acquire();
@@ -153,7 +165,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		}
 	}
 
-	public static void vServer(){
+	private static void vServer(){
 		countAvailable++;
 		serversMutex.release();
 	}
@@ -181,7 +193,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 		changed = true;
 
-		// v();
+		v();
 		return 1;
 	}
 
@@ -212,7 +224,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		} catch (Exception e) {}
 
 		try {
-			p();			
+			p("query");			
 			System.out.println("JOB Query to: " + server);
 			remoteConnection.Query(query, port);
 		} catch (Exception e) {
@@ -226,11 +238,49 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 	@Override
 	public int Insert(int id, String port) {
+		InterfaceServer remoteConnection = null;
+		String server = "";
+		try {
+			pServer();
+			server = freeServers.remove();
+			busyServers.put(server, key(getClientHost(), port));
+			remoteConnection = (InterfaceServer) registerHost(getIp(server),getPort(server));
+		} catch (Exception e) {}
+
+		try {
+			p("insert");
+			System.out.println("JOB Insert to: " + server);
+			remoteConnection.Insert(id, port);
+		} catch (Exception e) {
+			System.out.println("RMI ERROR CALLING SERVER: " + e.getLocalizedMessage());
+			if(debug)
+				e.printStackTrace();
+		}
+
 		return 1;
 	}
 
 	@Override
 	public int Remove(int id, String port) {
+		InterfaceServer remoteConnection = null;
+		String server = "";
+		try {
+			pServer();
+			server = freeServers.remove();
+			busyServers.put(server, key(getClientHost(), port));
+			remoteConnection = (InterfaceServer) registerHost(getIp(server),getPort(server));
+		} catch (Exception e) {}
+
+		try {
+			p("remove");			
+			System.out.println("JOB Remove to: " + server);
+			remoteConnection.Remove(id, port);
+		} catch (Exception e) {
+			System.out.println("RMI ERROR CALLING SERVER: " + e.getLocalizedMessage());
+			if(debug)
+				e.printStackTrace();
+		}
+
 		return 1;
 	}
 
