@@ -19,8 +19,8 @@ class RMIClient extends UnicastRemoteObject implements InterfaceCallback {
 	public static void main(String[] args) {
 		int result;
 
-		if (args.length != 7) {
-			System.out.println("Usage: java RMIClient <semaphore ip> <semaphore port> <client ip> <client port> <Queries %> <Inserts %> <Deletions %>");
+		if (args.length < 7 || args.length > 8) {
+			System.out.println("Usage: java RMIClient <semaphore ip> <semaphore port> <client ip> <client port> <Queries %> <Inserts %> <Deletions %> [method]");
 			System.exit(1);
 		}
 		try {
@@ -33,9 +33,14 @@ class RMIClient extends UnicastRemoteObject implements InterfaceCallback {
 			System.exit(1);
 		}
 
+		String method = "";
+		if (args.length == 8){
+			method = args[7];
+		}
+
 		registryRMI(args[2], args[3]);
 		registerHost(args[0], args[1]);
-		runtime(args[3]);
+		runtime(args[3], method);
 	}
 
 /* ------------------------------------------------------------- */
@@ -47,7 +52,7 @@ class RMIClient extends UnicastRemoteObject implements InterfaceCallback {
 			System.setProperty("java.rmi.server.hostname", ip);
 
 			LocateRegistry.createRegistry(registry);
-			System.out.println("java RMI registry created.");
+			System.out.println("RMI CLIENT registry created.");
 		} catch (RemoteException e) {
 			System.out.println("java RMI registry already exists.");
 		}
@@ -55,9 +60,9 @@ class RMIClient extends UnicastRemoteObject implements InterfaceCallback {
 		try {
 			String server = "rmi://" + ip + ":" + registry + "/Callback";
 			Naming.rebind(server, new RMIServer());
-			System.out.println("RMI Server is ready.");
+			System.out.println("RMI Client is ready.");
 		} catch (Exception e) {
-			System.out.println("RMI Server failed: " + e);
+			System.out.println("RMI Client failed: " + e);
 			if(debug)
 				e.printStackTrace();
 		}
@@ -68,7 +73,7 @@ class RMIClient extends UnicastRemoteObject implements InterfaceCallback {
 
 		remoteConnection = null;
 		try {
-			System.out.println("Connecting to semaphore at : " + connectLocation);
+			System.out.println("Bridge: " + connectLocation);
 			remoteConnection = (InterfaceServer) Naming.lookup(connectLocation);
 		} catch (Exception e) {
 			System.out.println ("RMI connection failed: " + e.getLocalizedMessage());
@@ -77,21 +82,36 @@ class RMIClient extends UnicastRemoteObject implements InterfaceCallback {
 		}
 	}
 
-	private static void runtime(String port) {
+	private static void runtime(String port, String method) {
 		while (true) {
 			try {
-				remoteConnection.Query("This is a query that was: ", port);
+				switch(method.toLowerCase()) {
+					case "query":
+						remoteConnection.Query(method, port);
+						break;
+					case "insert":
+						remoteConnection.Insert(0, port);
+						break;
+					case "remove":
+						remoteConnection.Remove(1, port);
+						break;
+
+					default:
+						remoteConnection.Query("- TEST QUERY -", port);
+				}
+
 				System.out.println("Call to server..." );
 			} catch (RemoteException e) {
 				System.out.println(e.getLocalizedMessage());
 				if(debug)
 					e.printStackTrace();
-				
+
 				break;
 			}
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException ex) {}
+			break;
 		}
 	}
 

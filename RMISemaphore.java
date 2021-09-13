@@ -6,6 +6,7 @@ import java.rmi.registry.LocateRegistry;
 import java.util.concurrent.Semaphore;
 import java.util.LinkedList;
 import java.util.HashMap;
+import java.util.Arrays;
 
 import java.lang.InterruptedException;
 
@@ -17,20 +18,28 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 	private static volatile String callback;
 	private static volatile boolean changed;
 
-	private static volatile HashMap<String, Integer> serverList;
-	private static volatile HashMap<String, String>  busyServer;
-	private static volatile LinkedList<String>  	 freeServer;
+	private static volatile HashMap<String, String>  busyServers;
+	private static volatile LinkedList<String>  	 freeServers;
 
-	private static Semaphore mutex;
-	private static String method;
-	private static int count;
+
+	private static volatile Semaphore serversMutex;
+	private static volatile int countAvailable;
+
+
+	private static volatile Semaphore mutex;
+	private static volatile String method;
+	private static volatile int count;
 
 
 	public RMISemaphore() throws RemoteException {
-		serverList = new HashMap<String, Integer>();
-		busyServer = new HashMap<String, String>();
-		freeServer = new LinkedList<String>();
+		busyServers = new HashMap<String, String>();
+		freeServers = new LinkedList<String>();
 		
+		serversMutex  = new Semaphore(1);
+		try { serversMutex.acquire(); }
+		catch (Exception e) {}
+		countAvailable  = 0;
+
 		mutex  = new Semaphore(1);
 		method = "";
 		count  = 0;
@@ -75,6 +84,21 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 		}
 	}
 
+	private static InterfaceServer registerHost(String hostname, String port) {
+		String connectLocation = "rmi://" + hostname + ":" + port + "/Server";
+
+		InterfaceServer remoteConnection = null;
+		try {
+			remoteConnection = (InterfaceServer) Naming.lookup(connectLocation);
+		} catch (Exception e) {
+			System.out.println ("RMI connection failed: " + e.getLocalizedMessage());
+			if(debug)
+				e.printStackTrace();
+		}
+
+		return remoteConnection;
+	}
+
 	private static void runtime() {
 		while (true) {
 			if (changed == true) {
@@ -83,7 +107,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 				String connectLocation = "rmi://" + remoteHostName + ":" + remoteHostPort + "/Callback";
 				InterfaceCallback callbackLocation = null;
 				try {
-					System.out.println(callback + " >> " + connectLocation);
+					System.out.println(callback + " > " + connectLocation);
 					callbackLocation = (InterfaceCallback) Naming.lookup(connectLocation);
 				} catch (Exception e) {
 					System.out.println ("Callback connection failed: " + e.getLocalizedMessage());
@@ -92,6 +116,7 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 				}
 				try {
 					callbackLocation.Callback(callback);
+					v();
 				} catch (RemoteException e) {
 					if(debug)
 						e.printStackTrace();
@@ -107,24 +132,48 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 	public static void p() throws InterruptedException {
 		mutex.acquire();
-		count += 1;
+		count++;
 	}
 
 	public static void v(){
-		mutex.release();
+		count--;
+		if(count == 0){
+			mutex.release();
+			method = "";
+		}
+	}
+
+
+	public static void pServer() throws InterruptedException {
+		if(countAvailable == 0) {
+			System.out.println("** Waiting free server");
+			serversMutex.acquire();
+		} else
+			countAvailable--;
+	}
+
+	public static void vServer(){
+		countAvailable++;
+		if(countAvailable > 0){
+			serversMutex.release();
+		}
 	}
 
 /* InterfaceSemaphore ------------------------------------------ */
 	
 	@Override
 	public int response(String content, String port) {
-		System.out.println("Received: " + content);
 		String dst = "";
 		try {
-			dst = busyServer.remove(key(getClientHost(), port));
+			String serverKey = key(getClientHost(), port);
+			dst = busyServers.remove(serverKey);
+			freeServers.add(serverKey);
+	
+			System.out.println(content + " < Server::" + serverKey);
 		} catch (Exception e) {
-
+			System.out.println(e.getLocalizedMessage());
 		}
+		
 
 		remoteHostPort = getPort(dst);
 		remoteHostName = getIp(dst);
@@ -139,12 +188,12 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 	@Override
 	public int register(String ip, String port) {
 		callback = "Server registered as key <" + ip + ":" + port + ">";
-		serverList.put(ip, Integer.parseInt(port));
-		freeServer.add(key(ip, port));
+		freeServers.add(key(ip, port));
 		remoteHostPort = port;
 		remoteHostName = ip;
-
 		changed = true;
+
+		vServer();
 		return 1;
 	}
 
@@ -153,31 +202,35 @@ class RMISemaphore extends UnicastRemoteObject implements InterfaceSemaphore, In
 
 	@Override
 	public int Query(String query, String port) {
-		String dst = "";
+		InterfaceServer remoteConnection = null;
 		try {
-			dst = key(getClientHost(), port);
+			pServer();
+			String server = freeServers.remove();
+			busyServers.put(server, key(getClientHost(), port));
+			remoteConnection = (InterfaceServer) registerHost(getIp(server),getPort(server));
+
+			System.out.println("JOB Query to: " + server);
 		} catch (Exception e) {}
 
-		try { p(); }
-		catch (Exception e) {}
-		
-		System.out.println(dst + " reachs query");
+		try {
+			p();
+			remoteConnection.Query(query, port);
+		} catch (Exception e) {
+			System.out.println("RMI ERROR CALLING SERVER: " + e.getLocalizedMessage());
+			if(debug)
+				e.printStackTrace();
+		}
+
 		return 1;
 	}
 
 	@Override
 	public int Insert(int id, String port) {
-		try { p(); }
-		catch (Exception e) {}
-
 		return 1;
 	}
 
 	@Override
 	public int Remove(int id, String port) {
-		try { p(); }
-		catch (Exception e) {}
-
 		return 1;
 	}
 

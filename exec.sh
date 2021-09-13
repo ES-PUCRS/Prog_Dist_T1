@@ -32,6 +32,7 @@ javac ./*.java -d "./_class" -Xlint:unchecked
 # 1 	CLIENT  	 ONLY
 # 9		CLIENT  	 $SEMAPHORE_PORT $CLIENT_PORT
 # 87	SAME CALL TERMINAL SERVER ONLY
+# 96	SAME CALL TERMINAL CLIENT $CLIENT_PORT $METHOD
 # 97	SAME CALL TERMINAL CLIENT ONLY
 # 99	SAME CALL TERMINAL CLIENT $SEMAPHORE_PORT $CLIENT_PORT 
 if [ $? -eq 0 ]
@@ -82,6 +83,13 @@ then
 		#   														          Port          Port
 		xterm -T "RMIClient" -ls -e "java -cp ./_class RMIClient $semaphore_ip $2 $client_ip $3 $queries $inserts $deletions && read -s -n 1 -p 'Press any button to continue.'" &
 	
+
+	# INIT CLIENT ONLY WITH PORT PARAM WITHOUT NEW TERMINAL
+	elif [[ $1 -eq "96" ]]
+	then
+	java -cp ./_class RMIClient $semaphore_ip $semaphore_port $client_ip $2 $queries $inserts $deletions $3
+
+
 	# INIT CLIENT ONLY WITHOUT NEW TERMINAL
 	elif [[ $1 -eq "97" ]]
 	then
